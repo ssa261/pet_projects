@@ -49,7 +49,8 @@ def plot_surface(clf, X, y):
 plt.figure(figsize=(15, 4))
 
 for i, (X, y) in enumerate(datasets):
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=123) 
+    # не r/s 42 так как 2-я выборка на нём не репрезентативна
 
     tree = DecisionTreeClassifier() # в 1 задании нужно обучить без параметров
     tree.fit(X_train, y_train)
@@ -61,3 +62,78 @@ for i, (X, y) in enumerate(datasets):
     plot_surface(tree, X, y) 
     plt.title(f"Выборка {i+1}\nTrain accuracy: {acc_train:.2f}, Test accuracy: {acc_test:.2f}")
 plt.show()
+
+# задание 2
+
+# бля, я умоляю, нормально перенеси в юпитер
+
+plt.figure(figsize=(15, 4))
+
+for i, (X, y) in enumerate(datasets):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=1) 
+    # не r/s 42 так как 2-я выборка на нём не репрезентативна
+
+    tree = DecisionTreeClassifier(max_depth=4, min_samples_leaf=5) # вообще, я бы взял cpp_alpfa. но, подозреваю, авторы хотят другого
+    tree.fit(X_train, y_train)
+
+    acc_train = tree.score(X_train, y_train)
+    acc_test = tree.score(X_test, y_test)
+
+    plt.subplot(1, 3, i + 1)
+    plot_surface(tree, X, y) 
+    plt.title(f"Выборка {i+1}\nTrain accuracy: {acc_train:.2f}, Test accuracy: {acc_test:.2f}")
+plt.show()
+
+# бонус
+
+import plotly.graph_objects as go
+import numpy as np
+from sklearn.tree import DecisionTreeClassifier
+
+# 1. Подготовка данных (возьмем "Луны")
+X, y = datasets[1]
+x_min, x_max = X[:, 0].min() - 0.5, X[:, 0].max() + 0.5
+y_min, y_max = X[:, 1].min() - 0.5, X[:, 1].max() + 0.5
+xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.05), # шаг 0.05, чтобы файл не весил 100Мб
+                     np.arange(y_min, y_max, 0.05))
+
+fig = go.Figure()
+
+# 2. Генерируем "слои" для разной глубины
+depths = range(1, 16)
+for depth in depths:
+    clf = DecisionTreeClassifier(max_depth=depth, random_state=42).fit(X, y)
+    Z = clf.predict(np.c_[xx.ravel(), yy.ravel()]).reshape(xx.shape)
+    
+    # Добавляем поверхность (изначально видима только первая)
+    fig.add_trace(go.Contour(
+        x=np.arange(x_min, x_max, 0.05),
+        y=np.arange(y_min, y_max, 0.05),
+        z=Z,
+        opacity=0.3,
+        showscale=False,
+        visible=(depth == 1), # Только первый слой True
+        name=f"Depth {depth}"
+    ))
+
+# 3. Добавляем сами точки (они видны всегда)
+fig.add_trace(go.Scatter(x=X[:, 0], y=X[:, 1], mode='markers', 
+                         marker=dict(color=y, size=10, line=dict(width=1, color='Black'))))
+
+# 4. Создаем логику слайдера
+steps = []
+for i, depth in enumerate(depths):
+    step = dict(
+        method="update",
+        label=str(depth),
+        args=[{"visible": [False] * len(depths) + [True]}, # Управление видимостью слоев
+              {"title": f"Decision Boundary (max_depth={depth})"}]
+    )
+    # Магия видимости: все False, кроме текущего индекса i
+    step["args"][0]["visible"][i] = True 
+    steps.append(step)
+
+sliders = [dict(active=0, currentvalue={"prefix": "Max Depth: "}, pad={"t": 50}, steps=steps)]
+
+fig.update_layout(sliders=sliders, title="Decision Boundary (max_depth=1)")
+fig.show()
